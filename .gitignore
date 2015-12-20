@@ -27,4 +27,5 @@ proguard/
 *.log
 *.iml
 .idea/
+.DS_Store
 gradle
