@@ -1,33 +1,46 @@
 package com.chen.scangon.helper;
 
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothClass;
+import android.bluetooth.BluetoothDevice;
 import android.os.Handler;
+import android.view.InputDevice;
 import android.view.KeyEvent;
-
-import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.Set;
 
 
 /**
- * 扫码枪事件解析类
+ * 扫码枪事件解析类 by chen
  */
 public class ScanGunKeyEventHelper {
 
-    //延迟500ms，判断扫码是否完成。
-    private final static long MESSAGE_DELAY = 500;
-    //扫码内容
-    private StringBuffer mStringBufferResult = new StringBuffer();
-    //大小写区分
-    private boolean mCaps;
+    private final static long MESSAGE_DELAY = 500;             //延迟500ms，判断扫码是否完成。
+    private StringBuffer mStringBufferResult;                  //扫码内容
+    private boolean mCaps;                                     //大小写区分
+    private final Handler mHandler;
+    private final BluetoothAdapter mBluetoothAdapter;
+    private final Runnable mScanningFishedRunnable;
     private OnScanSuccessListener mOnScanSuccessListener;
-    private Handler mHandler = new Handler();
+    private String mDeviceName;
 
-    private final Runnable mScanningFishedRunnable = new Runnable() {
-        @Override
-        public void run() {
-            performScanSuccess();
-        }
-    };
+    public ScanGunKeyEventHelper(OnScanSuccessListener onScanSuccessListener) {
+        mOnScanSuccessListener = onScanSuccessListener ;
+        mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        mStringBufferResult = new StringBuffer();
+        mHandler = new Handler();
+        mScanningFishedRunnable = new Runnable() {
+            @Override
+            public void run() {
+                performScanSuccess();
+            }
+        };
+    }
 
-    //返回扫描结果
+
+    /**
+     * 返回扫码成功后的结果
+     */
     private void performScanSuccess() {
         String barcode = mStringBufferResult.toString();
         if (mOnScanSuccessListener != null)
@@ -35,7 +48,11 @@ public class ScanGunKeyEventHelper {
         mStringBufferResult.setLength(0);
     }
 
-    //key事件处理
+
+    /**
+     * 扫码枪事件解析
+     * @param event
+     */
     public void analysisKeyEvent(KeyEvent event) {
 
         int keyCode = event.getKeyCode();
@@ -121,17 +138,81 @@ public class ScanGunKeyEventHelper {
 
 
     public interface OnScanSuccessListener {
-        public void onScanSuccess(String barcode);
+        void onScanSuccess(String barcode);
     }
 
-    public void setOnBarCodeCatchListener(OnScanSuccessListener onScanSuccessListener) {
-        mOnScanSuccessListener = onScanSuccessListener;
-    }
 
     public void onDestroy() {
         mHandler.removeCallbacks(mScanningFishedRunnable);
         mOnScanSuccessListener = null;
     }
+
+
+    //部分手机如三星，无法使用该方法
+//    private void hasScanGun() {
+//        Configuration cfg = getResources().getConfiguration();
+//        return cfg.keyboard != Configuration.KEYBOARD_NOKEYS;
+//    }
+
+    /**
+     * 扫描枪是否连接
+     * @return
+     */
+    public boolean hasScanGun() {
+
+        if (mBluetoothAdapter == null) {
+            return false;
+        }
+
+        Set<BluetoothDevice> blueDevices = mBluetoothAdapter.getBondedDevices();
+
+        if (blueDevices == null || blueDevices.size() <= 0) {
+            return false;
+        }
+
+        for (Iterator<BluetoothDevice> iterator = blueDevices.iterator(); iterator.hasNext(); ) {
+            BluetoothDevice bluetoothDevice = iterator.next();
+
+            if (bluetoothDevice.getBluetoothClass().getMajorDeviceClass() == BluetoothClass.Device.Major.PERIPHERAL) {
+                mDeviceName = bluetoothDevice.getName();
+                return isInputDeviceExist(mDeviceName);
+            }
+
+        }
+
+        return false;
+
+    }
+
+
+    /**
+     * 输入设备是否存在
+     * @param deviceName
+     * @return
+     */
+    private boolean isInputDeviceExist(String deviceName) {
+        int[] deviceIds = InputDevice.getDeviceIds();
+
+        for (int id : deviceIds) {
+            if (InputDevice.getDevice(id).getName().equals(deviceName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+
+    /**
+     * 是否为扫码枪事件(部分机型KeyEvent获取的名字错误)
+     * @param event
+     * @return
+     */
+    @Deprecated
+    public boolean isScanGunEvent(KeyEvent event) {
+        return event.getDevice().getName().equals(mDeviceName);
+    }
+
+
 
 }
 
